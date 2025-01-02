@@ -15,9 +15,7 @@ use qrcode::QrCode;
 use std::fs;
 use std::env;
 
-// Launch the server
 pub async fn start_server() {
-    // Configure routes
     let app = Router::new()
         .route("/", get(landing_page))
         .route("/generate_wallets", get(generate_wallets_form).post(generate_wallets))
@@ -28,7 +26,7 @@ pub async fn start_server() {
         .route("/save_all_qr_codes", post(save_all_qr_codes))
         .route("/save_extended_priv_keys", post(save_extended_priv_keys))
         .route("/save_child_keys", post(save_child_keys))
-        .fallback(handle_404); // Catch-all route for 404 errors
+        .fallback(handle_404);
 
     let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
     println!("✅ Server running at http://{addr}");
@@ -39,7 +37,6 @@ pub async fn start_server() {
         .unwrap();
 }
 
-// Reusable HTML template function
 fn html_template(title: &str, content: &str) -> String {
     format!(
         r#"
@@ -170,7 +167,6 @@ fn html_template(title: &str, content: &str) -> String {
     )
 }
 
-// Main landing page
 async fn landing_page() -> impl IntoResponse {
     Html(html_template(
         "Bitcoin Wallet Generator",
@@ -192,7 +188,6 @@ async fn landing_page() -> impl IntoResponse {
     ))
 }
 
-// 404 Error Page
 async fn handle_404() -> impl IntoResponse {
     Html(html_template(
         "404 Not Found",
@@ -208,7 +203,6 @@ async fn handle_404() -> impl IntoResponse {
     ))
 }
 
-// Form to generate wallets
 async fn generate_wallets_form() -> impl IntoResponse {
     Html(html_template(
         "Generate Wallets",
@@ -229,14 +223,12 @@ async fn generate_wallets_form() -> impl IntoResponse {
     ))
 }
 
-// Route to handle wallet generation
 #[derive(Deserialize)]
 struct WalletRequest {
     count: usize,
 }
 
 async fn generate_wallets(Form(input): Form<WalletRequest>) -> impl IntoResponse {
-    // Ensure the count is within the allowed range
     let count = input.count.min(100).max(1);
 
     let mut wallets = Vec::new();
@@ -336,7 +328,6 @@ async fn generate_wallets(Form(input): Form<WalletRequest>) -> impl IntoResponse
     ))
 }
 
-// Route to save all wallets
 #[derive(Deserialize)]
 struct SaveAllWalletsRequest {
     wallets: String,
@@ -358,12 +349,11 @@ async fn save_all_wallets(Form(input): Form<SaveAllWalletsRequest>) -> impl Into
     existing_wallets.extend(wallets_data);
 
     match fs::write(&file_path, serde_json::to_string_pretty(&existing_wallets).unwrap()) {
-        Ok(_) => "All wallets saved successfully!".to_string(),
+        Ok(_) => format!("All wallets saved successfully at: {}", file_path.display()),
         Err(_) => "Failed to save wallets.".to_string(),
     }
 }
 
-// Route to save all QR codes
 #[derive(Deserialize)]
 struct SaveAllQrCodesRequest {
     wallets: String,
@@ -384,10 +374,9 @@ async fn save_all_qr_codes(Form(input): Form<SaveAllQrCodesRequest>) -> impl Int
             Err(_) => return format!("Failed to generate QR code for wallet {}", address).to_string(),
         }
     }
-    "All QR codes saved successfully!".to_string()
+    format!("All QR codes saved successfully in: data/qr_codes/")
 }
 
-// Form to generate extended private key
 async fn extended_priv_key_form() -> impl IntoResponse {
     Html(html_template(
         "Generate Extended Private Key",
@@ -408,7 +397,6 @@ async fn extended_priv_key_form() -> impl IntoResponse {
     ))
 }
 
-// Route to handle extended private key generation
 #[derive(Deserialize)]
 struct ExtendedPrivKeyRequest {
     seed: String,
@@ -499,7 +487,6 @@ async fn generate_extended_priv_key(Form(input): Form<ExtendedPrivKeyRequest>) -
     }
 }
 
-// Route to save extended private keys
 #[derive(Deserialize)]
 struct SaveExtendedPrivKeysRequest {
     ext_keys: String,
@@ -521,12 +508,11 @@ async fn save_extended_priv_keys(Form(input): Form<SaveExtendedPrivKeysRequest>)
     existing_ext_keys.extend(ext_keys_data);
 
     match fs::write(&file_path, serde_json::to_string_pretty(&existing_ext_keys).unwrap()) {
-        Ok(_) => "Extended private key saved successfully!".to_string(),
+        Ok(_) => format!("Extended private key saved successfully at: {}", file_path.display()),
         Err(_) => "Failed to save extended private key.".to_string(),
     }
 }
 
-// Form to derive child key
 async fn derive_child_key_form() -> impl IntoResponse {
     Html(html_template(
         "Derive Child Key",
@@ -555,7 +541,6 @@ async fn derive_child_key_form() -> impl IntoResponse {
     ))
 }
 
-// Route to handle child key derivation
 #[derive(Deserialize)]
 struct ChildKeyRequest {
     private_key: String,
@@ -564,7 +549,6 @@ struct ChildKeyRequest {
 }
 
 async fn derive_child_key(Form(input): Form<ChildKeyRequest>) -> impl IntoResponse {
-    // Convert parent private key and chain code
     let parent_private_key = match hex::decode(&input.private_key) {
         Ok(bytes) if bytes.len() == 32 => {
             let mut key = [0u8; 32];
@@ -609,13 +593,11 @@ async fn derive_child_key(Form(input): Form<ChildKeyRequest>) -> impl IntoRespon
         }
     };
 
-    // Create parent key
     let parent_ext_key = ExtendedPrivKey {
         private_key: parent_private_key,
         chain_code,
     };
 
-    // Derive child key
     match parent_ext_key.derive_child_key(input.index) {
         Ok(child_key) => {
             let child_key_json = json!({
@@ -692,7 +674,6 @@ async fn derive_child_key(Form(input): Form<ChildKeyRequest>) -> impl IntoRespon
     }
 }
 
-// Route to save child keys
 #[derive(Deserialize)]
 struct SaveChildKeysRequest {
     child_keys: String,
@@ -714,12 +695,11 @@ async fn save_child_keys(Form(input): Form<SaveChildKeysRequest>) -> impl IntoRe
     existing_child_keys.extend(child_keys_data);
 
     match fs::write(&file_path, serde_json::to_string_pretty(&existing_child_keys).unwrap()) {
-        Ok(_) => "Child key saved successfully!".to_string(),
+        Ok(_) => format!("Child key saved successfully at: {}", file_path.display()),
         Err(_) => "Failed to save child key.".to_string(),
     }
 }
 
-// Form to generate QR code
 async fn qr_code_form() -> impl IntoResponse {
     Html(html_template(
         "Generate QR Code",
@@ -740,7 +720,6 @@ async fn qr_code_form() -> impl IntoResponse {
     ))
 }
 
-// Route to handle QR code generation
 #[derive(Deserialize)]
 struct QRCodeRequest {
     address: String,
@@ -782,7 +761,6 @@ async fn generate_qr_code_web(Form(input): Form<QRCodeRequest>) -> impl IntoResp
     }
 }
 
-// Function to generate QR code
 fn generate_qr_code(data: &str, file_name: &str) -> Result<(), String> {
     let code = QrCode::new(data).map_err(|e| e.to_string())?;
     let image = code

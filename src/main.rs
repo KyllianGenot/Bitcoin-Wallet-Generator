@@ -18,7 +18,6 @@ use web::start_server;
 fn main() {
     let rt = tokio::runtime::Runtime::new().unwrap();
 
-    // Create necessary directories if they don't exist
     create_directories().expect("Failed to create directories");
 
     loop {
@@ -125,10 +124,9 @@ fn generate_wallets() {
         });
 
         wallets.push(wallet_json);
-        addresses.push(address); // Stocker les adresses pour une sélection ultérieure
+        addresses.push(address);
     }
 
-    // Une fois les portefeuilles générés, demander pour quels QR codes générer
     println!("\n📷 Which wallets would you like to generate QR codes for?");
     println!("   Enter 'all' for all wallets, 'none' for none, or a comma-separated list of indexes (e.g., 1,3,5): ");
 
@@ -149,7 +147,6 @@ fn generate_wallets() {
             println!("\n📝 No QR codes will be generated.");
         }
         _ => {
-            // Gérer une liste d'index spécifiés
             let indexes: Vec<usize> = qr_choice
                 .split(',')
                 .filter_map(|s| s.trim().parse::<usize>().ok())
