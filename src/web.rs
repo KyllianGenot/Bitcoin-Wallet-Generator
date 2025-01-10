@@ -15,28 +15,33 @@ use qrcode::QrCode;
 use std::fs;
 use std::env;
 
+// Starts the web server with defined routes
 pub async fn start_server() {
+    // Define the application routes
     let app = Router::new()
-        .route("/", get(landing_page))
-        .route("/generate_wallets", get(generate_wallets_form).post(generate_wallets))
-        .route("/extended_priv_key", get(extended_priv_key_form).post(generate_extended_priv_key))
-        .route("/derive_child_key", get(derive_child_key_form).post(derive_child_key))
-        .route("/qr_code", get(qr_code_form).post(generate_qr_code_web))
-        .route("/save_all_wallets", post(save_all_wallets))
-        .route("/save_all_qr_codes", post(save_all_qr_codes))
-        .route("/save_extended_priv_keys", post(save_extended_priv_keys))
-        .route("/save_child_keys", post(save_child_keys))
-        .fallback(handle_404);
+        .route("/", get(landing_page)) // Landing page
+        .route("/generate_wallets", get(generate_wallets_form).post(generate_wallets)) // Wallet generation
+        .route("/extended_priv_key", get(extended_priv_key_form).post(generate_extended_priv_key)) // Extended private key generation
+        .route("/derive_child_key", get(derive_child_key_form).post(derive_child_key)) // Child key derivation
+        .route("/qr_code", get(qr_code_form).post(generate_qr_code_web)) // QR code generation
+        .route("/save_all_wallets", post(save_all_wallets)) // Save all wallets
+        .route("/save_all_qr_codes", post(save_all_qr_codes)) // Save all QR codes
+        .route("/save_extended_priv_keys", post(save_extended_priv_keys)) // Save extended private keys
+        .route("/save_child_keys", post(save_child_keys)) // Save child keys
+        .fallback(handle_404); // 404 handler
 
+    // Define the server address
     let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
     println!("✅ Server running at http://{addr}");
 
+    // Start the server
     axum::Server::bind(&addr)
         .serve(app.into_make_service())
         .await
         .unwrap();
 }
 
+// HTML template for consistent styling across pages
 fn html_template(title: &str, content: &str) -> String {
     format!(
         r#"
@@ -167,6 +172,7 @@ fn html_template(title: &str, content: &str) -> String {
     )
 }
 
+// Landing page handler
 async fn landing_page() -> impl IntoResponse {
     Html(html_template(
         "Bitcoin Wallet Generator",
@@ -188,6 +194,7 @@ async fn landing_page() -> impl IntoResponse {
     ))
 }
 
+// 404 error handler
 async fn handle_404() -> impl IntoResponse {
     Html(html_template(
         "404 Not Found",
@@ -203,6 +210,7 @@ async fn handle_404() -> impl IntoResponse {
     ))
 }
 
+// Wallet generation form handler
 async fn generate_wallets_form() -> impl IntoResponse {
     Html(html_template(
         "Generate Wallets",
@@ -223,19 +231,21 @@ async fn generate_wallets_form() -> impl IntoResponse {
     ))
 }
 
+// Form data structure for wallet generation
 #[derive(Deserialize)]
 struct WalletRequest {
     count: usize,
 }
 
+// Wallet generation handler
 async fn generate_wallets(Form(input): Form<WalletRequest>) -> impl IntoResponse {
-    let count = input.count.min(100).max(1);
+    let count = input.count.min(100).max(1); // Limit the number of wallets to 100
 
     let mut wallets = Vec::new();
     for _ in 0..count {
-        let mnemonic = Mnemonic::generate(128);
-        let seed = Seed::new(&mnemonic.to_string(), "");
-        let wallet = Wallet::from_seed(seed.as_bytes()).unwrap();
+        let mnemonic = Mnemonic::generate(128); // Generate a 12-word mnemonic
+        let seed = Seed::new(&mnemonic.to_string(), ""); // Derive seed from mnemonic
+        let wallet = Wallet::from_seed(seed.as_bytes()).unwrap(); // Create wallet from seed
         let wallet_data = json!({
             "Mnemonic": mnemonic.to_string(),
             "Address": wallet.get_address(),
@@ -328,11 +338,13 @@ async fn generate_wallets(Form(input): Form<WalletRequest>) -> impl IntoResponse
     ))
 }
 
+// Form data structure for saving all wallets
 #[derive(Deserialize)]
 struct SaveAllWalletsRequest {
     wallets: String,
 }
 
+// Handler to save all wallets to a file
 async fn save_all_wallets(Form(input): Form<SaveAllWalletsRequest>) -> impl IntoResponse {
     let current_dir = env::current_dir().unwrap();
     let file_path = current_dir.join("data/wallets/wallets.json");
@@ -354,11 +366,13 @@ async fn save_all_wallets(Form(input): Form<SaveAllWalletsRequest>) -> impl Into
     }
 }
 
+// Form data structure for saving all QR codes
 #[derive(Deserialize)]
 struct SaveAllQrCodesRequest {
     wallets: String,
 }
 
+// Handler to save all QR codes to files
 async fn save_all_qr_codes(Form(input): Form<SaveAllQrCodesRequest>) -> impl IntoResponse {
     let wallets_data: Vec<Value> = match serde_json::from_str(&input.wallets) {
         Ok(data) => data,
@@ -377,6 +391,7 @@ async fn save_all_qr_codes(Form(input): Form<SaveAllQrCodesRequest>) -> impl Int
     format!("All QR codes saved successfully in: data/qr_codes/")
 }
 
+// Extended private key generation form handler
 async fn extended_priv_key_form() -> impl IntoResponse {
     Html(html_template(
         "Generate Extended Private Key",
@@ -397,11 +412,13 @@ async fn extended_priv_key_form() -> impl IntoResponse {
     ))
 }
 
+// Form data structure for extended private key generation
 #[derive(Deserialize)]
 struct ExtendedPrivKeyRequest {
     seed: String,
 }
 
+// Handler to generate an extended private key
 async fn generate_extended_priv_key(Form(input): Form<ExtendedPrivKeyRequest>) -> impl IntoResponse {
     match hex::decode(&input.seed) {
         Ok(seed) => match ExtendedPrivKey::new(&seed) {
@@ -487,11 +504,13 @@ async fn generate_extended_priv_key(Form(input): Form<ExtendedPrivKeyRequest>) -
     }
 }
 
+// Form data structure for saving extended private keys
 #[derive(Deserialize)]
 struct SaveExtendedPrivKeysRequest {
     ext_keys: String,
 }
 
+// Handler to save extended private keys to a file
 async fn save_extended_priv_keys(Form(input): Form<SaveExtendedPrivKeysRequest>) -> impl IntoResponse {
     let current_dir = env::current_dir().unwrap();
     let file_path = current_dir.join("data/extended_keys/extended_keys.json");
@@ -513,6 +532,7 @@ async fn save_extended_priv_keys(Form(input): Form<SaveExtendedPrivKeysRequest>)
     }
 }
 
+// Child key derivation form handler
 async fn derive_child_key_form() -> impl IntoResponse {
     Html(html_template(
         "Derive Child Key",
@@ -541,6 +561,7 @@ async fn derive_child_key_form() -> impl IntoResponse {
     ))
 }
 
+// Form data structure for child key derivation
 #[derive(Deserialize)]
 struct ChildKeyRequest {
     private_key: String,
@@ -548,6 +569,7 @@ struct ChildKeyRequest {
     index: u32,
 }
 
+// Handler to derive a child key
 async fn derive_child_key(Form(input): Form<ChildKeyRequest>) -> impl IntoResponse {
     let parent_private_key = match hex::decode(&input.private_key) {
         Ok(bytes) if bytes.len() == 32 => {
@@ -674,11 +696,13 @@ async fn derive_child_key(Form(input): Form<ChildKeyRequest>) -> impl IntoRespon
     }
 }
 
+// Form data structure for saving child keys
 #[derive(Deserialize)]
 struct SaveChildKeysRequest {
     child_keys: String,
 }
 
+// Handler to save child keys to a file
 async fn save_child_keys(Form(input): Form<SaveChildKeysRequest>) -> impl IntoResponse {
     let current_dir = env::current_dir().unwrap();
     let file_path = current_dir.join("data/child_keys/child_keys.json");
@@ -700,6 +724,7 @@ async fn save_child_keys(Form(input): Form<SaveChildKeysRequest>) -> impl IntoRe
     }
 }
 
+// QR code generation form handler
 async fn qr_code_form() -> impl IntoResponse {
     Html(html_template(
         "Generate QR Code",
@@ -720,11 +745,13 @@ async fn qr_code_form() -> impl IntoResponse {
     ))
 }
 
+// Form data structure for QR code generation
 #[derive(Deserialize)]
 struct QRCodeRequest {
     address: String,
 }
 
+// Handler to generate a QR code
 async fn generate_qr_code_web(Form(input): Form<QRCodeRequest>) -> impl IntoResponse {
     let file_name = format!("data/qr_codes/{}.svg", input.address);
     match generate_qr_code(&input.address, &file_name) {
@@ -761,6 +788,7 @@ async fn generate_qr_code_web(Form(input): Form<QRCodeRequest>) -> impl IntoResp
     }
 }
 
+// Helper function to generate a QR code and save it to a file
 fn generate_qr_code(data: &str, file_name: &str) -> Result<(), String> {
     let code = QrCode::new(data).map_err(|e| e.to_string())?;
     let image = code

@@ -5,23 +5,27 @@ use num_bigint::BigUint;
 use num_traits::Num;
 use std::convert::TryInto;
 
+// Extended private key structure for Bitcoin wallet
 pub struct ExtendedPrivKey {
-    pub private_key: [u8; 32],
-    pub chain_code: [u8; 32],
+    pub private_key: [u8; 32], // 32-byte private key
+    pub chain_code: [u8; 32],  // 32-byte chain code for key derivation
 }
 
 impl ExtendedPrivKey {
+    // Generates a new extended private key from a seed
     pub fn new(seed: &[u8]) -> Result<Self, &'static str> {
         if seed.len() < 16 || seed.len() > 64 {
             return Err("Seed length must be between 16 and 64 bytes");
         }
 
+        // HMAC-SHA512 with "Bitcoin seed" as key
         let mut hmac = Hmac::<Sha512>::new_from_slice(b"Bitcoin seed")
             .map_err(|_| "HMAC initialization failed")?;
         hmac.update(seed);
         let result = hmac.finalize().into_bytes();
         let (private_key, chain_code) = result.split_at(32);
 
+        // Convert slices to fixed-size arrays
         let private_key: [u8; 32] = private_key
             .try_into()
             .map_err(|_| "Invalid private key length")?;
@@ -29,6 +33,7 @@ impl ExtendedPrivKey {
             .try_into()
             .map_err(|_| "Invalid chain code length")?;
 
+        // Validate private key range
         if !Self::is_valid_private_key(&private_key) {
             return Err("Invalid private key: out of range");
         }
@@ -39,13 +44,16 @@ impl ExtendedPrivKey {
         })
     }
 
+    // Checks if private key is within valid range
     fn is_valid_private_key(key: &[u8; 32]) -> bool {
         SecretKey::from_slice(key).is_ok()
     }
 
+    // Derives a child key from the current key using an index
     pub fn derive_child_key(&self, index: u32) -> Result<Self, &'static str> {
         let mut data = Vec::new();
 
+        // Hardened vs non-hardened derivation
         if index >= 0x80000000 {
             data.push(0);
             data.extend_from_slice(&self.private_key);
@@ -59,12 +67,14 @@ impl ExtendedPrivKey {
 
         data.extend_from_slice(&index.to_be_bytes());
 
+        // HMAC-SHA512 for child key derivation
         let mut hmac = Hmac::<Sha512>::new_from_slice(&self.chain_code)
             .map_err(|_| "HMAC initialization failed")?;
         hmac.update(&data);
         let result = hmac.finalize().into_bytes();
         let (child_key, child_chain_code) = result.split_at(32);
 
+        // Add parent and child private keys
         let derived_key = add_scalars(
             &self.private_key,
             &child_key.try_into().map_err(|_| "Invalid child key length")?,
@@ -78,6 +88,7 @@ impl ExtendedPrivKey {
     }
 }
 
+// Adds two scalars (private keys) modulo the curve order
 fn add_scalars(a: &[u8; 32], b: &[u8; 32]) -> Result<[u8; 32], &'static str> {
     const GROUP_ORDER_HEX: &str = "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141";
 
